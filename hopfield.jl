@@ -78,7 +78,6 @@ function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, patt
           i_ext[i] = pattern1[i]*I_strength
         end
     end
-
 end
 
 
