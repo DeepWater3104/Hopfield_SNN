@@ -7,7 +7,7 @@ using Plots
     τ::FT = 20.
     wexec::FT = 5.
     vrest::FT = -65.
-    θ::FT = -40.
+    θ::FT = -55.
     r_m::FT = 16.
     I_strength::FT = 1.5
     decay::FT = 0.5
@@ -30,47 +30,14 @@ end
 end
 
 
-function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, pattern2::Vector, connection::Vector, weight::Vector)
+function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, pattern2::Vector)
     @unpack NX, NY, N, x, y, i_ext, gsyn = variable
     @unpack wexec, I_strength = param
 
     for i=1:N
-        y[i] = UInt32(floor((i-1) / NX)) + 1
-        x[i] = UInt32(i - (y[i]-1)*NX)
+        y[i] = UInt32(floor((i-1) / NY)) + 1
+        x[i] = UInt32(i - (y[i]-1)*NY)
     end
-
-    tmp = zeros(N, N)
-    max_connections = 0
-    for i=1:N
-        num_connections = 0
-        for j=1:N
-            tmp[i, j] += wexec * pattern1[i] * pattern1[j]
-            tmp[i, j] += wexec * pattern2[i] * pattern2[j]
-            if 1e-10 < tmp[i, j]
-                num_connections += 1
-            end
-        end
-
-        if max_connections < num_connections
-            max_connections = num_connections
-        end
-    end
-
-    # store synaptic connection and its weight by ELL matrix
-    connection = zeros(N, max_connections)
-    weight = zeros(N, max_connections)
-
-    for i=1:N
-        num_connections = 0
-        for j=1:N
-            if 1e-10 < tmp[i, j]
-                num_connections += 1
-                connection[i, num_connections] = j
-                weight[i, num_connections] = tmp[i, j]
-            end
-        end
-    end
-
 
     # re-consider this input pattern later
     for i=1:N
@@ -101,7 +68,7 @@ function update_LIF!( variable::LIF, param::LIFParameter, dt, time, SpikeTime::V
 end
 
 
-function calculate_synaptic_current!( variable::LIF, param::LIFParameter, connection::Vector, weight::Vector )
+function calculate_synaptic_current!( variable::LIF, param::LIFParameter, connection::Matrix, weight::Matrix )
     @unpack gsyn, N, spike = variable
     @unpack decay = param
 
@@ -109,18 +76,26 @@ function calculate_synaptic_current!( variable::LIF, param::LIFParameter, connec
     for pre = 1:N
         if spike[pre] == 1
             # loop about all the post-synaptic neuron
-            for i=1:length(connection)
-                r[connection[pre, i]] += 1*weight[pre, i]
+            for i=1:size(connection, 2)
+                if connection[pre, i] != 0
+                    r[connection[pre, i]] += 1*weight[pre, i]
+                end
             end
         end
     end
     gsyn = gsyn * decay + r
 end
 
+function output_trace!( t, varr, variable::LIF )
+    @unpack v, N = variable
+    for i=1:N
+        varr[i, t] = v[i]
+    end
+end
 
 Random.seed!(10)
-T = 500
-dt = 0.01f0
+T = 1000
+dt = 1.0
 NX = 5
 NY = 5
 nt = UInt(T/dt)
@@ -139,21 +114,56 @@ pattern2 = [0, 0, 1, 0, 0,
             0, 0, 1, 0, 0]
 
 neurons = LIF{Float32}(N=NX*NY, NX=NX, NY=NY)
-connection = Vector{Float32}[]
-weight = Vector{Float32}[]
-initialize!(neurons, neurons.param, pattern1, pattern2, connection, weight)
+initialize!(neurons, neurons.param, pattern1, pattern2)
+
+tmp = zeros(neurons.NX, neurons.NY, neurons.NX, neurons.NY)
+max_connections = 0
+for i=1:neurons.N
+    num_connections = 0
+    for j=1:neurons.N
+        tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]] += neurons.param.wexec * pattern1[i] * pattern1[j]
+        tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]] += neurons.param.wexec * pattern2[i] * pattern2[j]
+        if 1e-10 < tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]]
+            num_connections += 1
+        end
+    end
+
+    if max_connections < num_connections
+        global max_connections = num_connections
+    end
+end
+
+# store synaptic connection and its weight by ELL matrix
+connection = zeros(UInt32, neurons.N, max_connections)
+weight = zeros(neurons.N, max_connections)
+
+for i=1:neurons.N
+    num_connections = 0
+    for j=1:neurons.N
+        if 1e-10 < tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]]
+            num_connections += 1
+            connection[i, num_connections] = (UInt32)(j)
+            weight[i, num_connections] = tmp[neurons.x[i], neurons.x[i], neurons.x[j], neurons.x[j]]
+
+        end
+    end
+end
+
 
 # for recording
 SpikeTime = []
 SpikeNeuron = []
-varr = zeros(nt)
+varr = zeros(neurons.N, nt)
+
+# simulation
 @time for i=1:nt
     update_LIF!(neurons, neurons.param, dt, t[i], SpikeTime, SpikeNeuron)
-    varr[i] = neurons.v[1]
+    output_trace!(i, varr, neurons)
     calculate_synaptic_current!(neurons, neurons.param, connection, weight)
 end
 
+# for outputting firing rate or each neurons
 firing_rate = zeros(NX, NY)
 for i=1:neurons.N
-    firing_rate[neurons.x[i], neurons.y[i]] = neurons.num_spikes[i]
+    firing_rate[neurons.y[i], neurons.x[i]] = neurons.num_spikes[i]
 end
