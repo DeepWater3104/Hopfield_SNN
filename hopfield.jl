@@ -6,7 +6,8 @@ using MLDatasets
 
 @kwdef struct LIFParameter{FT}
     τ::FT = 20.
-    wexec::FT = 5.
+    wexec::FT = 2.
+    #wexec::FT = 0.
     vrest::FT = -65.
     θ::FT = -55.
     r_m::FT = 16.
@@ -44,19 +45,19 @@ function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, patt
         y[i] = UInt32(i - (x[i]-1)*NY)
     end
 
-    tmp = zeros(neurons.NX, neurons.NY, neurons.NX, neurons.NY)
+    tmp = zeros(neurons.N, neurons.N)
     num_connections = zeros(UInt32, N)
     for i=1:neurons.N
         for j=1:neurons.N
-            tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]] += neurons.param.wexec * pattern1[i] * pattern1[j]
-            #tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]] += neurons.param.wexec * pattern2[i] * pattern2[j]
-            if 1e-10 < tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]]
+            tmp[i, j] += neurons.param.wexec * pattern1[i] * pattern1[j]
+            tmp[i, j] += neurons.param.wexec * pattern2[i] * pattern2[j]
+            if 1e-10 < tmp[i, j]
                 num_connections[i] += 1
             end
         end
     end
 
-    # store synaptic connection and its weight by ELL matrix
+    # store synaptic connection and its weight with sparse ELL matrix format
     for i=1:N
         connection[i] = zeros(UInt32, num_connections[i])
         weight[i] = zeros(Float64, num_connections[i])
@@ -65,18 +66,18 @@ function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, patt
     for i=1:neurons.N
         num_connections = 0
         for j=1:neurons.N
-            if 1e-10 < tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]]
+            if 1e-10 < tmp[i, j]
                 num_connections += 1
-                connection[i][num_connections] = (UInt32)(j)
-                weight[i][num_connections] = tmp[neurons.x[i], neurons.x[i], neurons.x[j], neurons.x[j]]
+                connection[i][num_connections] = j
+                weight[i][num_connections] = tmp[i, j]
             end
         end
     end
 
-    # re-consider this input pattern later
     for i=1:N
         #if x[i] < 10
-        if 25 > x[i]
+        #if x[i] < 10
+        if x[i] < 5
           #whcih to recall
           i_ext[i] = pattern1[i]*I_strength
           #i_ext[i] = pattern2[i]*I_strength
@@ -145,18 +146,6 @@ NY = size(pattern[:, :, 1], 1)
 nt = UInt(T/dt)
 t = Array{Float32}(1:nt)*dt
 
-#pattern1 = [1, 0, 0, 0, 1,
-#            0, 1, 0, 1, 0,
-#            0, 0, 1, 0, 0,
-#            0, 1, 0, 1, 0,
-#            1, 0, 0, 0, 1]
-#
-#pattern2 = [0, 0, 1, 0, 0,
-#            0, 0, 1, 0, 0,
-#            1, 1, 1, 1, 1,
-#            0, 0, 1, 0, 0,
-#            0, 0, 1, 0, 0]
-
 pattern1 = pattern[:, :, 50]
 pattern2 = pattern[:, :, 1111]
 #for i=1:length(pattern[:, :,1], dims=1)
@@ -175,14 +164,14 @@ varr = zeros(nt, neurons.N)
     calculate_synaptic_current!(neurons, neurons.param)
 end
 
-# for outputting firing rate or each neurons
+# output firing rate of each neurons
 firing_rate = zeros(NY, NX)
 for i=1:neurons.N
-    firing_rate[neurons.y[i], neurons.x[i]] = neurons.num_spikes[i]
+    firing_rate[neurons.y[i], neurons.x[i]] = neurons.num_spikes[i]/(T*0.001)
 end
 
-#p1 = heatmap(firing_rate, yflip=true, clims=(0,100))
-p1 = heatmap(transpose(firing_rate), yflip=true)
-p2 = heatmap(transpose(pattern1), yflip=true)
-p3 = heatmap(transpose(pattern2), yflip=true)
+p1 = heatmap(transpose(firing_rate), yflip=true, title="output")
+p2 = heatmap(transpose(pattern1), yflip=true, title="embedded pattern1")
+p3 = heatmap(transpose(pattern2), yflip=true, title="embedded pattern2")
 plot(p1, p2, p3, layout=(3,1))
+savefig("typical_behavior.png")
