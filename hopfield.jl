@@ -10,7 +10,7 @@ using MLDatasets
     vrest::FT = -65.
     θ::FT = -55.
     r_m::FT = 16.
-    I_strength::FT = 1.5
+    I_strength::FT = 5.
     decay::FT = 0.5
     vpeak::FT = 20.
 end
@@ -40,8 +40,8 @@ function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, patt
     @unpack wexec, I_strength = param
 
     for i=1:N
-        y[i] = UInt32(floor((i-1) / NY)) + 1
-        x[i] = UInt32(i - (y[i]-1)*NY)
+        x[i] = UInt32(floor((i-1) / NY)) + 1
+        y[i] = UInt32(i - (x[i]-1)*NY)
     end
 
     tmp = zeros(neurons.NX, neurons.NY, neurons.NX, neurons.NY)
@@ -49,7 +49,7 @@ function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, patt
     for i=1:neurons.N
         for j=1:neurons.N
             tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]] += neurons.param.wexec * pattern1[i] * pattern1[j]
-            tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]] += neurons.param.wexec * pattern2[i] * pattern2[j]
+            #tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]] += neurons.param.wexec * pattern2[i] * pattern2[j]
             if 1e-10 < tmp[neurons.x[i], neurons.y[i], neurons.x[j], neurons.y[j]]
                 num_connections[i] += 1
             end
@@ -75,10 +75,11 @@ function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, patt
 
     # re-consider this input pattern later
     for i=1:N
-        if x[i] < 5
+        #if x[i] < 10
+        if 25 > x[i]
           #whcih to recall
-          #i_ext[i] = pattern1[i]*I_strength
-          i_ext[i] = pattern2[i]*I_strength
+          i_ext[i] = pattern1[i]*I_strength
+          #i_ext[i] = pattern2[i]*I_strength
         end
     end
 end
@@ -138,8 +139,9 @@ end
 Random.seed!(10)
 T = 1000
 dt = 1.0
-NX = 28
-NY = 28
+pattern = MNIST(:train).features
+NX = size(pattern[:, :, 1], 2)
+NY = size(pattern[:, :, 1], 1)
 nt = UInt(T/dt)
 t = Array{Float32}(1:nt)*dt
 
@@ -155,9 +157,9 @@ t = Array{Float32}(1:nt)*dt
 #            0, 0, 1, 0, 0,
 #            0, 0, 1, 0, 0]
 
-pattern = MNIST(:train).features
-pattern1 = pattern[:, :, 1]
-pattern2 = pattern[:, :, 3]
+pattern1 = pattern[:, :, 50]
+pattern2 = pattern[:, :, 1111]
+#for i=1:length(pattern[:, :,1], dims=1)
 neurons = LIF{Float32}(N=NX*NY, NX=NX, NY=NY)
 initialize!(neurons, neurons.param, vec(pattern1), vec(pattern2))
 
@@ -179,7 +181,8 @@ for i=1:neurons.N
     firing_rate[neurons.y[i], neurons.x[i]] = neurons.num_spikes[i]
 end
 
-p1 = heatmap(firing_rate, yflip=true, clims=(0,100))
+#p1 = heatmap(firing_rate, yflip=true, clims=(0,100))
+p1 = heatmap(transpose(firing_rate), yflip=true)
 p2 = heatmap(transpose(pattern1), yflip=true)
 p3 = heatmap(transpose(pattern2), yflip=true)
 plot(p1, p2, p3, layout=(3,1))
