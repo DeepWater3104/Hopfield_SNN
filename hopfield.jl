@@ -7,7 +7,6 @@ using MLDatasets
 @kwdef struct LIFParameter{FT}
     τ::FT = 20.
     wexec::FT = 2.
-    #wexec::FT = 0.
     vrest::FT = -65.
     θ::FT = -55.
     r_m::FT = 16.
@@ -36,7 +35,7 @@ end
 end
 
 
-function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, pattern2::Vector)
+function initialize!( variable::LIF, param::LIFParameter, pattern::Vector, recall_pattern)
     @unpack NX, NY, N, x, y, i_ext, gsyn, connection, weight = variable
     @unpack wexec, I_strength = param
 
@@ -49,8 +48,9 @@ function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, patt
     num_connections = zeros(UInt32, N)
     for i=1:neurons.N
         for j=1:neurons.N
-            tmp[i, j] += neurons.param.wexec * pattern1[i] * pattern1[j]
-            tmp[i, j] += neurons.param.wexec * pattern2[i] * pattern2[j]
+            for k=1:length(pattern)
+                tmp[i, j] += neurons.param.wexec * pattern[k][i] * pattern[k][j] / length(pattern)
+            end
             if 1e-10 < tmp[i, j]
                 num_connections[i] += 1
             end
@@ -75,12 +75,9 @@ function initialize!( variable::LIF, param::LIFParameter, pattern1::Vector, patt
     end
 
     for i=1:N
-        #if x[i] < 10
-        #if x[i] < 10
-        if x[i] < 5
+        if y[i] > NY/2
           #whcih to recall
-          i_ext[i] = pattern1[i]*I_strength
-          #i_ext[i] = pattern2[i]*I_strength
+          i_ext[i] = pattern[recall_pattern][i]*I_strength
         end
     end
 end
@@ -140,17 +137,29 @@ end
 Random.seed!(10)
 T = 1000
 dt = 1.0
-pattern = MNIST(:train).features
-NX = size(pattern[:, :, 1], 2)
-NY = size(pattern[:, :, 1], 1)
+num_patterns = 30
+mnist = MNIST(:train).features
+NX = size(mnist[:, :, 1], 2)
+NY = size(mnist[:, :, 1], 1)
 nt = UInt(T/dt)
 t = Array{Float32}(1:nt)*dt
 
-pattern1 = pattern[:, :, 50]
-pattern2 = pattern[:, :, 1111]
-#for i=1:length(pattern[:, :,1], dims=1)
+pattern = Vector{Matrix{Float32}}(undef, num_patterns)
+pattern_vectorized = Vector{Vector{Float32}}(undef, num_patterns)
+pattern_index = [rand(1:size(mnist, 3)) for i in 1:num_patterns]
+for i=1:num_patterns
+    pattern[i] = Matrix{Float32}(undef, NY, NX)
+    pattern_vectorized[i] = Vector{Float32}(undef, NY*NX)
+    pattern[i] = mnist[:, :, pattern_index[i]]
+    pattern_vectorized[i] = vec(pattern[i])
+end
+recall_pattern = 2
+
+
+#pattern1 = mnist[:, :, 50]
+#pattern2 = mnist[:, :, 1111]
 neurons = LIF{Float32}(N=NX*NY, NX=NX, NY=NY)
-initialize!(neurons, neurons.param, vec(pattern1), vec(pattern2))
+initialize!(neurons, neurons.param, pattern_vectorized, recall_pattern)
 
 # for recording
 SpikeTime = []
@@ -171,7 +180,7 @@ for i=1:neurons.N
 end
 
 p1 = heatmap(transpose(firing_rate), yflip=true, title="output")
-p2 = heatmap(transpose(pattern1), yflip=true, title="embedded pattern1")
-p3 = heatmap(transpose(pattern2), yflip=true, title="embedded pattern2")
+p2 = heatmap(transpose(pattern[1]), yflip=true, title="embedded pattern1")
+p3 = heatmap(transpose(pattern[2]), yflip=true, title="embedded pattern2")
 plot(p1, p2, p3, layout=(3,1))
-savefig("typical_behavior.png")
+#savefig("typical_behavior.png")
