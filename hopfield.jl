@@ -137,7 +137,7 @@ end
 Random.seed!(10)
 T = 1000
 dt = 1.0
-num_patterns = 30
+num_patterns = 3
 mnist = MNIST(:train).features
 NX = size(mnist[:, :, 1], 2)
 NY = size(mnist[:, :, 1], 1)
@@ -183,4 +183,4 @@ p1 = heatmap(transpose(firing_rate), yflip=true, title="output")
 p2 = heatmap(transpose(pattern[1]), yflip=true, title="embedded pattern1")
 p3 = heatmap(transpose(pattern[2]), yflip=true, title="embedded pattern2")
 plot(p1, p2, p3, layout=(3,1))
-#savefig("typical_behavior.png")
+savefig("typical_behavior.png")
