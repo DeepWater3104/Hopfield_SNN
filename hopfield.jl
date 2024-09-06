@@ -156,8 +156,6 @@ end
 recall_pattern = 2
 
 
-#pattern1 = mnist[:, :, 50]
-#pattern2 = mnist[:, :, 1111]
 neurons = LIF{Float32}(N=NX*NY, NX=NX, NY=NY)
 initialize!(neurons, neurons.param, pattern_vectorized, recall_pattern)
 
