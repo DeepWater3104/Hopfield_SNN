@@ -17,15 +17,17 @@ using MLDatasets
     wexec::FT = 2.
     A_p::FT = 0.01
     A_m::FT = A_p
-    τ_p::FT = 2e-2
-    τ_m::FT = 2e-2
+    #τ_p::FT = 2e-1
+    #τ_m::FT = 2e-1
+    τ_p::FT = 10.
+    τ_m::FT = 10.
 
     # poisson random
     poisson_rate::FT = 200. # Hz
     poisson_weight::FT = 5.
 
     # others
-    I_strength::FT = 5.
+    I_strength::FT = 2.
 end
 
 @kwdef mutable struct LIF{FT}
@@ -109,9 +111,9 @@ function calculate_synaptic_current!( variable::LIF, param::LIFParameter, dt )
         end
     end 
 
-    poisson_spike = rand(N)
+    poisson_rand = rand(N)
     for pst = 1:N
-        if poisson[pst] && poisson_spike[pst] < poisson_rate*0.001*dt
+        if poisson[pst] && (poisson_rand[pst] < poisson_rate*0.001*dt)
             r[pst] += poisson_weight
         end
         gsyn[pst] = gsyn[pst] * decay + r[pst]
@@ -180,7 +182,8 @@ recall_pattern = 1
 #N = NX*NY
 T_per_pattern_learn =  2000
 T_per_pattern_recall =  300
-dt = 1.0
+dt = 1
+#dt = 0.1
 nt_per_pattern_learn = UInt(floor(T_per_pattern_learn/dt))
 nt_per_pattern_recall = UInt(floor(T_per_pattern_recall/dt))
 t = Array{Float32}(1:(nt_per_pattern_learn+nt_per_pattern_recall)*num_patterns)*dt
