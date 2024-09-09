@@ -256,8 +256,8 @@ for i=1:neurons.N
 end
 
 p1 = heatmap(transpose(num_spikes_learn_matrix), yflip=true, title="learn")
-p2 = heatmap(transpose(num_spikes_recall_matrix), yflip=true, title="recall")
+p2 = heatmap(transpose(num_spikes_recall_matrix), yflip=true, title="recall", clims=(0, 10))
 p3 = heatmap(transpose(pattern[1]), yflip=true, title="embedded pattern1")
 #p3 = heatmap(transpose(pattern[2]), yflip=true, title="embedded pattern2")
 plot(p1, p2, p3, layout=(3,1))
-#savefig("typical_behavior.png")
+savefig("ongoing-result.png")
