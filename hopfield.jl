@@ -88,7 +88,6 @@ function update_LIF!( variable::LIF, param::LIFParameter, dt, time, SpikeTime::V
     @unpack τ, wexec, vrest, θ, r_m, decay, vpeak = param
 
     for i=1:N
-        v[i] += dt*(vrest - v[i] + gsyn[i] + r_m * (i_ext[i] + rand() ) ) / τ
         if spike[i] == 1
             v[i] = vrest
         end
@@ -100,7 +99,7 @@ function update_LIF!( variable::LIF, param::LIFParameter, dt, time, SpikeTime::V
             num_spikes[i] += 1
         else
             spike[i] = 0
-            v[i] = v[i]
+            v[i] += dt*(vrest - v[i] + gsyn[i] + r_m * (i_ext[i] + rand() ) ) / τ
         end
     end
 end
