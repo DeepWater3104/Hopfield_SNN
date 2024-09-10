@@ -145,42 +145,22 @@ function stdp!( variable::LIF, param::LIFParameter, dt )
     end
 end
 
-function output_trace!( t, varr, weightarr, variable::LIF )
+function output_trace!( t, varr, variable::LIF )
     @unpack v, N, weight = variable
     for i=1:N
         varr[t, i] = v[i]
     end
-    weightarr[t, :, :] .= weight
 end
 
 Random.seed!(10)
-num_patterns = 1
-pattern1 = [1 0 0 0 1;
-            0 1 0 1 0;
-            0 0 1 0 0;
-            0 1 0 1 0;
-            1 0 0 0 1]
-#pattern2 = [0 0 1 0 0;
-#            0 0 1 0 0;
-#            1 1 1 1 1;
-#            0 0 1 0 0;
-#            0 0 1 0 0]
-NX = size(pattern1, 2)
-NY = size(pattern1, 1)
-N = NX*NY
-pattern = Vector{Matrix{Float32}}(undef, num_patterns)
-pattern_vectorized = Vector{Vector{Float32}}(undef, num_patterns)
-pattern[1] = Matrix{Float32}(undef, NY, NX)
-pattern_vectorized[1] = Vector{Float32}(undef, NY*NX)
-pattern[1] = pattern1
-pattern_vectorized[1] = vec(pattern[1])
+num_patterns = 3
 recall_pattern = 1
 
-#mnist = MNIST(:train).features
-#NX = size(mnist[:, :, 1], 2)
-#NY = size(mnist[:, :, 1], 1)
-#N = NX*NY
-T_per_pattern_learn =  2000
+mnist = MNIST(:train).features
+NX = size(mnist[:, :, 1], 2)
+NY = size(mnist[:, :, 1], 1)
+N = NX*NY
+T_per_pattern_learn =  1000
 T_per_pattern_recall =  300
 dt = 1
 #dt = 0.1
@@ -188,16 +168,15 @@ nt_per_pattern_learn = UInt(floor(T_per_pattern_learn/dt))
 nt_per_pattern_recall = UInt(floor(T_per_pattern_recall/dt))
 t = Array{Float32}(1:(nt_per_pattern_learn+nt_per_pattern_recall)*num_patterns)*dt
 
-#pattern = Vector{Matrix{Float32}}(undef, num_patterns)
-#pattern_vectorized = Vector{Vector{Float32}}(undef, num_patterns)
-#pattern_index = [rand(1:size(mnist, 3)) for i in 1:num_patterns]
-#for i=1:num_patterns
-#    pattern[i] = Matrix{Float32}(undef, NY, NX)
-#    pattern_vectorized[i] = Vector{Float32}(undef, NY*NX)
-#    pattern[i] = mnist[:, :, pattern_index[i]]
-#    pattern_vectorized[i] = vec(pattern[i])
-#end
-#recall_pattern = 1
+pattern = Vector{Matrix{Float32}}(undef, num_patterns)
+pattern_vectorized = Vector{Vector{Float32}}(undef, num_patterns)
+pattern_index = [rand(1:size(mnist, 3)) for i in 1:num_patterns]
+for i=1:num_patterns
+    pattern[i] = Matrix{Float32}(undef, NY, NX)
+    pattern_vectorized[i] = Vector{Float32}(undef, NY*NX)
+    pattern[i] = mnist[:, :, pattern_index[i]]
+    pattern_vectorized[i] = vec(pattern[i])
+end
 
 
 neurons = LIF{Float32}(N=NX*NY, NX=NX, NY=NY)
@@ -209,7 +188,6 @@ SpikeNeuron = []
 num_spikes_learn = zeros(num_patterns, N)
 num_spikes_recall = zeros(num_patterns, N)
 varr = zeros((nt_per_pattern_learn+nt_per_pattern_recall)*num_patterns, neurons.N )
-weightarr = zeros( (nt_per_pattern_learn+nt_per_pattern_recall)*num_patterns, neurons.N, neurons.N )
 
 # simulation (learning phase)
 @time for i=1:num_patterns
@@ -217,8 +195,8 @@ weightarr = zeros( (nt_per_pattern_learn+nt_per_pattern_recall)*num_patterns, ne
         neurons.poisson[j] = (pattern_vectorized[i][j] > 0)
     end
     for t=(i-1)*nt_per_pattern_learn+1:i*nt_per_pattern_learn
-        output_trace!(t, varr, weightarr, neurons)
-        update_LIF!(neurons, neurons.param, dt, t[i], SpikeTime, SpikeNeuron)
+        output_trace!(t, varr, neurons)
+        update_LIF!(neurons, neurons.param, dt, t, SpikeTime, SpikeNeuron)
         calculate_synaptic_current!(neurons, neurons.param, dt)
         stdp!(neurons, neurons.param, dt)
     end
@@ -236,8 +214,8 @@ neurons.poisson = zeros(N)
         end
     end
     for t=num_patterns*nt_per_pattern_learn+(i-1)*nt_per_pattern_recall+1:num_patterns*nt_per_pattern_learn+i*nt_per_pattern_recall
-        output_trace!(t, varr, weightarr, neurons)
-        update_LIF!(neurons, neurons.param, dt, t[i], SpikeTime, SpikeNeuron)
+        output_trace!(t, varr, neurons)
+        update_LIF!(neurons, neurons.param, dt, t, SpikeTime, SpikeNeuron)
         calculate_synaptic_current!(neurons, neurons.param, dt)
     end
     num_spikes_recall[i, :] = neurons.num_spikes
