@@ -1,29 +1,29 @@
-# Execution
+# Implementation of Hopfield Networks Using Spiking Neuron Model
+## Execution
+### 1. move to the directory under which julia code exist
 
-move to the directory under which julia code exist
-
-```
-original_network/code
+```bash
+cd original_network/code
 ```
 or
-```
-symmetrySTDP/code
+```bash
+cd symmetrySTDP/code
 ```
 
-open REPL
-
+### 2. open REPL
 ```bash
 julia 
 ```
 
-then,
-
+### 3. run
 ```jl
-include("hopfield.jl")
+include("5x5.jl")
 ```
 
 or 
 
 ```jl
-include("hopfield_STDP.jl")
+include("mnist.jl")
 ```
+
+# Description of this Model
