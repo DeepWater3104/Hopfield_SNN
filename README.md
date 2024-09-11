@@ -26,4 +26,4 @@ or
 include("mnist.jl")
 ```
 
-# Description of this Model
+# Model
