@@ -1,27 +1,23 @@
 @kwdef struct LIFParameter{FT}
     τ::FT = 20.
-    wexec::FT = 5.
+    I_strength::FT = 1.5
     vrest::FT = -65.
     θ::FT = -55.
     r_m::FT = 16.
-    I_strength::FT = 1.5
-    decay::FT = 0.5
-    vpeak::FT = 20.
+    τ_syn::FT = 4.
 end
+
 
 @kwdef mutable struct LIF{FT}
     param::LIFParameter{FT} = LIFParameter{FT}()
     NX::UInt32
     NY::UInt32
     N::UInt32
+    wexec::FT
     x::Vector{UInt32} = zeros(N)
     y::Vector{UInt32} = zeros(N)
-
-    connection::Vector{Vector{UInt32}} = [Vector{UInt32}(undef, 0) for _ in 1:N]
-    weight::Vector{Vector{Float64}} = [Vector{UInt32}(undef, 0) for _ in 1:N]
-
+    weight::Matrix{Float32} = zeros(N, N)
     i_ext::Vector{FT} = zeros(N)
-
     v::Vector{FT} = fill(param.vrest, N)
     gsyn::Vector{FT} = zeros(N)
     spike::Vector{FT} = zeros(N)
@@ -30,92 +26,68 @@ end
 
 
 function initialize!( variable::LIF, param::LIFParameter, pattern::Vector, recall_pattern)
-    @unpack NX, NY, N, x, y, i_ext, gsyn, connection, weight = variable
-    @unpack wexec, I_strength = param
+    @unpack NX, NY, N, x, y, i_ext, gsyn, weight, wexec = variable
+    @unpack I_strength = param
 
     for i=1:N
-        x[i] = UInt32(floor((i-1) / NY)) + 1
-        y[i] = UInt32(i - (x[i]-1)*NY)
+        y[i] = UInt32(floor((i-1) / NY)) + 1
+        x[i] = UInt32(i - (y[i]-1)*NY)
     end
 
-    tmp = zeros(neurons.N, neurons.N)
-    num_connections = zeros(UInt32, N)
-    for i=1:neurons.N
-        for j=1:neurons.N
-            for k=1:length(pattern)
-                tmp[i, j] += neurons.param.wexec * pattern[k][i] * pattern[k][j] / length(pattern)
-            end
-            if 1e-10 < tmp[i, j]
-                num_connections[i] += 1
-            end
-        end
-    end
-
-    # store synaptic connection and its weight with sparse ELL matrix format
-    for i=1:N
-        connection[i] = zeros(UInt32, num_connections[i])
-        weight[i] = zeros(Float64, num_connections[i])
-    end
-
-    for i=1:neurons.N
-        num_connections = 0
-        for j=1:neurons.N
-            if 1e-10 < tmp[i, j]
-                num_connections += 1
-                connection[i][num_connections] = j
-                weight[i][num_connections] = tmp[i, j]
+    for pre=1:neurons.N
+        for post=1:neurons.N
+            if pre != post
+                for k=1:length(pattern)
+                    weight[pre, post] += (wexec * pattern[k][pre] * pattern[k][post]) / length(pattern)
+                end
             end
         end
     end
 
     for i=1:N
         if y[i] > NY/2
-          #whcih to recall
-          i_ext[i] = pattern[recall_pattern][i]*I_strength
+            i_ext[i] = pattern[recall_pattern][i]*I_strength
+        else
+            i_ext[i] = 0
         end
     end
 end
 
 
-function update_LIF!( variable::LIF, param::LIFParameter, dt, time, SpikeTime::Vector, SpikeNeuron::Vector )
+function update_LIF!( variable::LIF, param::LIFParameter, dt, time, SpikeTime::Vector, SpikeNeuron::Vector, rng )
     @unpack v, gsyn, i_ext, spike, num_spikes, N = variable
-    @unpack τ, wexec, vrest, θ, r_m, decay, vpeak = param
+    @unpack τ, vrest, θ, r_m = param
 
+    noise = (3*randn(rng, N).+1)*sqrt(dt)
     for i=1:N
-        if spike[i] == 1
-            v[i] = vrest
-        end
         if v[i] > θ
             spike[i] = 1
-            v[i] = vpeak
+            v[i] = vrest
             push!(SpikeTime, time)
             push!(SpikeNeuron, i)
             num_spikes[i] += 1
         else
+            v[i] += ( (vrest - v[i] + gsyn[i] + r_m*i_ext[i])*dt + noise[i] ) / τ
             spike[i] = 0
-            v[i] += dt*(vrest - v[i] + gsyn[i] + r_m * (i_ext[i] + rand() ) ) / τ
         end
     end
 end
 
 
 function calculate_synaptic_current!( variable::LIF, param::LIFParameter )
-    @unpack gsyn, N, spike, connection, weight = variable
-    @unpack decay = param
+    @unpack gsyn, N, spike, weight = variable
+    @unpack τ_syn= param
 
     r = zeros(N)
     for pre = 1:N
         if spike[pre] == 1
-            # loop about all the post-synaptic neuron
-            for i=1:size(connection, 2)
-                if connection[pre, i] != 0
-                    r[connection[pre, i]] += 1*weight[pre, i]
-                end
+            for post = 1:N
+                r[post] += weight[pre, post]
             end
         end
     end
-    for pst = 1:N
-        gsyn[pst] = gsyn[pst] * decay + r[pst]
+    for post = 1:N
+        gsyn[post] = gsyn[post] * exp(-dt/τ_syn) + r[post]
     end
 end
 
