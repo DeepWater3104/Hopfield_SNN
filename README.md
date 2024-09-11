@@ -10,6 +10,7 @@ or
 symmetrySTDP/code
 ```
 
+open REPL
 
 ```bash
 julia 
