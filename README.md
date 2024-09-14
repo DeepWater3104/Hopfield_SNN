@@ -1,4 +1,4 @@
-# Implementation of Hopfield Networks Using a Spiking Neuron Model
+# Implementation of Autoassociative Memory Using a Spiking Neuron Model
 ## Execution
 ### 1. move to the directory under which julia code exist
 

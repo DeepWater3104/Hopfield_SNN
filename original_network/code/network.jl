@@ -74,7 +74,7 @@ function update_LIF!( variable::LIF, param::LIFParameter, dt, time, SpikeTime::V
 end
 
 
-function calculate_synaptic_current!( variable::LIF, param::LIFParameter )
+function calculate_synaptic_current!( variable::LIF, param::LIFParameter, dt )
     @unpack gsyn, N, spike, weight = variable
     @unpack τ_syn= param
 

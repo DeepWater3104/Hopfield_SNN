@@ -54,7 +54,7 @@ varr = zeros(nt_sampling, neurons.N)
 sampling_index = 1
 @time for i=1:nt
     update_LIF!(neurons, neurons.param, dt, dt*i, SpikeTime, SpikeNeuron, rng)
-    calculate_synaptic_current!(neurons, neurons.param)
+    calculate_synaptic_current!(neurons, neurons.param, dt)
     if (time[sampling_index] - i*dt) < 1e-10
         output_trace!(sampling_index, varr, neurons)
         global sampling_index += 1
