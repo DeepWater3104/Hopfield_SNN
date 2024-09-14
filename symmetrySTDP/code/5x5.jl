@@ -109,8 +109,8 @@ p4 = heatmap(transpose(num_spikes_recall_matrix[2, :, :]), yflip=true, title="re
 p5 = heatmap(transpose(pattern[1]), yflip=true, title="embedded pattern1", color=:Blues)
 p6 = heatmap(transpose(pattern[2]), yflip=true, title="embedded pattern2", color=:Blues)
 plot(p1, p2, p3, p4, p5, p6, layout=(3, 2))
-savefig("failure.png")
+savefig("../figure/failure.png")
 
 a = reshape(weightarr, size(weightarr, 1), size(weightarr, 2)^2)
 plot(time, a)
-savefig("synapse_growth.png")
+savefig("../figure/synapse_growth.png")
